@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI-Powered SQL Generator (Local)</title>
+  <style>
+    /* Reset & base */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    .container {
+      background: white;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      max-width: 700px;
+      width: 100%;
+      padding: 30px 40px;
+    }
+
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 18px;
+      font-size: 1rem;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      transition: border-color 0.3s ease;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"]:focus {
+      border-color: #3498db;
+      outline: none;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.3s ease;
+      margin-bottom: 30px;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 14px 18px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+      resize: vertical;
+      background: #f9f9f9;
+      margin-bottom: 30px;
+      color: #2c3e50;
+    }
+
+    textarea:focus {
+      border-color: #3498db;
+      outline: none;
+      background: white;
+    }
+
+    .result {
+      background: #ecf0f1;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: inset 0 0 5px #bdc3c7;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background: #3498db;
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:hover {
+      background: #d6eaf8;
+    }
+
+    .no-results {
+      text-align: center;
+      color: #7f8c8d;
+      font-style: italic;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .container {
+        padding: 20px;
+      }
+      button, input[type="text"], textarea {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 AI-Powered SQL Query Generator (Offline)</h1>
+  <div class="container">
+    <label for="nl-input">Enter your natural language question:</label>
+    <input
+      type="text"
+      id="nl-input"
+      placeholder="e.g., Show all employees in Engineering department"
+      autocomplete="off"
+    />
+
+    <button onclick="generateSQL()">Generate SQL & Execute</button>
+
+    <label for="sql-output">Generated SQL Query:</label>
+    <textarea id="sql-output" readonly placeholder="Your generated SQL query will appear here..."></textarea>
+
+    <label>Query Results:</label>
+    <div class="result" id="query-result">No results yet</div>
+  </div>
+
+  <script>
+    async function generateSQL() {
+      const question = document.getElementById("nl-input").value.trim();
+      if (!question) {
+        alert("Please enter a question!");
+        return;
+      }
+
+      // Clear previous outputs
+      document.getElementById("sql-output").value = "Generating SQL...";
+      document.getElementById("query-result").innerHTML = "Loading results...";
+
+      try {
+        const response = await fetch("/generate_sql", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question })
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+        const data = await response.json();
+
+        // Show generated SQL
+        document.getElementById("sql-output").value = data.query || "No SQL generated.";
+
+        // Render results
+        const results = data.results;
+        const container = document.getElementById("query-result");
+
+        if (Array.isArray(results) && results.length > 0) {
+          let html = "<table><thead><tr>";
+
+          // Column headers
+          Object.keys(results[0]).forEach(col => {
+            html += `<th>${col}</th>`;
+          });
+          html += "</tr></thead><tbody>";
+
+          // Rows
+          results.forEach(row => {
+            html += "<tr>";
+            Object.values(row).forEach(val => {
+              html += `<td>${val === null ? "" : val}</td>`;
+            });
+            html += "</tr>";
+          });
+
+          html += "</tbody></table>";
+          container.innerHTML = html;
+        } else if (Array.isArray(results) && results.length === 0) {
+          container.innerHTML = `<div class="no-results">No rows found.</div>`;
+        } else {
+          container.innerHTML = `<div class="no-results">Error: ${results}</div>`;
+        }
+
+      } catch (error) {
+        document.getElementById("sql-output").value = "";
+        document.getElementById("query-result").innerHTML = `<div class="no-results">Error: ${error.message}</div>`;
+        console.error("Fetch error:", error);
+      }
+    }
+  </script>
+</body>
+</html>
